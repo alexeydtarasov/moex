@@ -40,9 +40,15 @@ def _is_token_granted(response_headers: dict) -> bool:
     return True
 
 
+def _read_token(path: str='../common_data/moex_token.txt'):
+    with open(path) as fin:
+        return fin.read().strip()
+
+
 def _safe_query(url: str, moex_token: str=None, timeout: int=10):
     headers = dict()
     if moex_token is not None:
+        moex_token = _read_token()
         headers = {"Cookie": f'MicexPassportCert={moex_token}'}
     for _ in range(2):
         try:
@@ -66,8 +72,16 @@ def _upd_token(prev_token: str) -> str:
             continue
         idx1 = text.find("MicexPassportCert=") + len("MicexPassportCert=")
         idx2 = text[idx1:].find('; ')
-        return text[idx1:(idx1+idx2)]
+        new_token = text[idx1:(idx1+idx2)]
+        _write_token(new_token)
+        return new_token
     return None
+
+
+def _write_token(token: str,
+                 path: str='../common_data/moex_token.txt'):
+    with open(path, 'w') as fout:
+        fout.write(token)
 
 
 def capitalization(ticker: str,
