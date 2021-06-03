@@ -4,7 +4,5 @@ Some functions for data loading from moex api
 
 ## Installation
 
-1. clone the repo
-2. add to .bashrc / .zshrc / .kshrc
-```
-PATH={path_to_the_repo}:$PATH
+Run into shell ```git clone 'https://github.com/alexeydtarasov/moex/' && cd moex && python install.py```
+
