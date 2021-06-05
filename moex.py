@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 
 from traceback import format_exc
+from config import logger, MOEX_TOKEN_PATH
 
 
 def _fmt_date(date):
@@ -17,7 +18,13 @@ def _history_price_range(ticker, date_to, date_from, columns, engine, market,
     url += f'&till={_fmt_date(date_to)}'
     resp = _safe_query(url, headers)
 
-    if resp is None or resp.status_code != 200:
+    if resp is None:
+        logger.error("Safe query returned None while parsing quotes for %s from %s to %s" %
+                     (ticker, _fmt_date(date_from), _fmt_date(date_to)))
+        return None
+    elif resp.status_code != 200:
+        logger.error("Error %i occurred while parsing quotes for %s from %s to %s" %
+                     (resp.status_code, ticker, _fmt_date(date_from), _fmt_date(date_to)))
         return None
 
     resp = resp.json()['history']
@@ -29,6 +36,8 @@ def _history_price_range(ticker, date_to, date_from, columns, engine, market,
             (df['TRADEDATE'].dt.date.between(date_from, date_to)),
             columns
         ].reset_index(drop=True)
+    logger.debug("Intermediate dataframe for %s from %s to %s: \n%s" %
+                 (ticker, _fmt_date(date_from), _fmt_date(date_to), df))
 
     return df
 
@@ -41,27 +50,26 @@ def _is_token_granted(response_headers: dict) -> bool:
 
 
 def _read_token(path: str='../common_data/moex_token.txt'):
-    with open(path) as fin:
-        return fin.read().strip()
+    try:
+        with open(path) as fin:
+            return fin.read().strip()
+    except:
+        logger.error("Failed to load token from %s:\n %s" % (path, format_exc()))
 
 
 def _safe_query(url: str, moex_token: str=None, timeout: int=10):
-    headers = dict()
-    try:
-        moex_token = _read_token()
-        print(moex_token)
-        headers = {"Cookie": f'MicexPassportCert={moex_token}'}
-    except FileNotFoundError:
-        pass
+    if moex_token is None:
+        moex_token = _read_token(MOEX_TOKEN_PATH)
+    headers = {"Cookie": f'MicexPassportCert={moex_token}'}
+
     for _ in range(2):
         try:
             resp = requests.get(url, headers=headers, timeout=timeout)
-            if len(headers) > 0 and not _is_token_granted(resp.headers):
-                token = _upd_token(headers['Cookie'].replace('MicexPassportCert=', ''))
-                headers = {"Cookie": f'MicexPassportCert={token}'}
             return resp
         except:
-            print(format_exc())
+            logger.debug("Safe query error:\n%s" % format_exc())
+            logger.debug("Request URL: %s" % url)
+            logger.debug("Request headers: %s" % headers)
             continue
 
 
@@ -76,15 +84,19 @@ def _upd_token(prev_token: str) -> str:
         idx1 = text.find("MicexPassportCert=") + len("MicexPassportCert=")
         idx2 = text[idx1:].find('; ')
         new_token = text[idx1:(idx1+idx2)]
-        _write_token(new_token)
+        _write_token(new_token, path=MOEX_TOKEN_PATH)
         return new_token
+    logger.warning("Failed to get updated MOEX token")
     return None
 
 
 def _write_token(token: str,
                  path: str='../common_data/moex_token.txt'):
-    with open(path, 'w') as fout:
-        fout.write(token)
+    try:
+        with open(path, 'w') as fout:
+            fout.write(token)
+    except:
+        logger.error("Failed to write token to %s: \n%s" % (path, format_exc()))
 
 
 def capitalization(ticker: str,
@@ -94,18 +106,25 @@ def capitalization(ticker: str,
     url = f'https://iss.moex.com/iss/engines/{engine}'
     url += f'/markets/{market}/securities/{ticker}.json'
 
-
     resp = _safe_query(url)
 
     if resp is None or resp.status_code != 200:
+        logger.error("Safe query returned None while parsing capitalization for %s" % ticker)
+        return None
+    elif resp.status_code != 200:
+        logger.error("Error %i occurred while parsing capitalization for %s" % (resp.status_code, ticker))
         return None
 
     resp = resp.json()['marketdata']
     df = pd.DataFrame(resp['data'], columns=resp['columns'])
 
     if len(df) > 0:
-        return df.loc[df['BOARDID'] == boardid, 'ISSUECAPITALIZATION'].values[0]
-    return None
+        cap = df.loc[df['BOARDID'] == boardid, 'ISSUECAPITALIZATION'].values[0]
+        logger.debug("Parsed %s capitalization: %s" % (ticker, cap))
+        return cap
+    else:
+        logger.error("Capitalization parser: parsed dataframe appears to be empty")
+        return None
 
 
 def history_price_range(ticker: str, date_to: datetime.date,
@@ -124,10 +143,11 @@ def history_price_range(ticker: str, date_to: datetime.date,
     Parameters:
         ticker: str
         date_to: datetime.date
-            If single date, then date_to is the only datetime parameter to set
-            Note that if date_to is not a trade day then function returns data for nearest
-            trade day in the past
+            Last date of parsing interval. Note that if date_to is not a trade day
+            then function returns data for nearest trade day in the past
         date_from: datetime.date
+            First date of parsing interval. If None, then function will return data
+            for last 50 calendar days (not trading days!)
         columns: list from
             ['BOARDID', 'TRADEDATE', 'SHORTNAME', 'SECID', 'NUMTRADES', 'VALUE',
            'OPEN', 'LOW', 'HIGH', 'LEGALCLOSEPRICE', 'WAPRICE', 'CLOSE', 'VOLUME',
@@ -174,11 +194,13 @@ def history_price_range(ticker: str, date_to: datetime.date,
 
         if df is not None:
             result_df = pd.concat([result_df, df], ignore_index=True)
-        else: break
+        else:
+            break
 
         current_date_from = current_date_from + datetime.timedelta(days=50)
 
-    if one_row: return result_df.tail(1)
+    if one_row:
+        return result_df.tail(1)
 
     if correct_from_date and date_from < result_df.loc[0, 'TRADEDATE']:
         date_to = date_from
@@ -188,10 +210,13 @@ def history_price_range(ticker: str, date_to: datetime.date,
         df = df.tail(1)
         result_df = pd.concat([df, result_df], ignore_index=True)
 
+    logger.debug("Final dataframe for %s from %s to %s: \n%s" %
+                 (ticker, _fmt_date(date_from), _fmt_date(date_to), result_df))
     return result_df.reset_index(drop=True)
 
 
-def orderbook(ticker, moex_token: str,
+def orderbook(ticker,
+              moex_token: str=None,
               depth: int=10,
               engine: str='stock',
               market: str='shares',
@@ -199,14 +224,14 @@ def orderbook(ticker, moex_token: str,
               columns: list=['SECID', 'BUYSELL', 'PRICE', 'QUANTITY', 'UPDATETIME']
               ) -> pd.DataFrame:
     """
-    Returns DataFrame with orderbook
+    Return DataFrame with orderbook
 
     Parameters:
         ticker: str
         moex_token: str
-            MOEX token auth is needed for orderbook data downloading
+            MOEX token auth is required for orderbook data downloading
         depth: int from {1, ... 10}
-            defines number of orders for particular type buy/sell
+            number of rows with buy/sell orders
         engine: str
         market: str
         boardid: str
@@ -219,8 +244,17 @@ def orderbook(ticker, moex_token: str,
     url += f'/markets/{market}/securities/{ticker}/orderbook.json'
 
     resp = _safe_query(url, moex_token=moex_token)
-    if resp.status_code != 200:
+
+    if resp is None or resp.status_code != 200:
+        logger.error("Safe query returned None while parsing orderbook for %s" % ticker)
         return None
+    elif resp.status_code != 200:
+        logger.error("Error %i occurred while parsing orderbook for %s" % (resp.status_code, ticker))
+        return None
+
+    if not _is_token_granted(resp.headers):
+        logger.warning("Orderbook parser: token appears to be invalid")
+
     resp = resp.json()['orderbook']
 
     try:
@@ -233,10 +267,12 @@ def orderbook(ticker, moex_token: str,
             int(df.shape[0] / 2 + depth)
         ]
         if df.shape[0] == 0:
+            logger.warning("%s orderbook appears to be empty" % ticker)
             return None
+        logger.debug("%s orderbook:\n%s" % (ticker, df))
         return df
     except:
-        print(format_exc())
+        logger.error("Failed to parse orderbook for %s:\n%s" % (ticker, format_exc()))
         return None
 
 
@@ -254,10 +290,20 @@ def realtime_price(ticker: str, moex_token: str=None,
     url = f'https://iss.moex.com/iss/engines/{engine}/markets/{market}'
     url += f'/securities/{ticker}.json'
     resp = _safe_query(url, moex_token)
-    if resp.status_code != 200:
+
+    if resp is None or resp.status_code != 200:
+        logger.error("Safe query returned None while parsing realtime price for %s" % ticker)
         return None
+    elif resp.status_code != 200:
+        logger.error("Error %i occurred while parsing realtime price for %s" % (resp.status_code, ticker))
+        return None
+
+    if not _is_token_granted(resp.headers):
+        logger.warning("Realtime price parser: token appears to be invalid")
+
     resp = resp.json()['marketdata']
     df = pd.DataFrame(resp['data'], columns=resp['columns'])
+    logger.debug("%s realtime quotes:\n%s" % (ticker, df))
     return df.loc[df['BOARDID'] == boardid, columns].reset_index(drop=True)
 
 
@@ -280,6 +326,8 @@ def trades(ticker: str,
             resp = _safe_query(base_url + additional, moex_token)
             if resp is None:
                 return None
+            if not _is_token_granted(resp.headers):
+                logger.warning("Trades parser: token appears to be invalid")
             resp = resp.json()['trades']
             if result_df is None:
                 result_df = pd.DataFrame(resp['data'], columns=resp['columns'])
@@ -294,4 +342,4 @@ def trades(ticker: str,
             last_trade_no = result_df.loc[len(result_df) - 1, 'TRADENO']
             additional = f'?tradeno={last_trade_no}&next_trade=1'
         except:
-            print(format_exc())
+            logger.warning("Error while parsing trades for %s:\n%s" % (ticker, format_exc()))
