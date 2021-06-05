@@ -1,14 +1,14 @@
-import os
-import subprocess
 import sys
+import os
 
-
-cur_path = os.getcwd()
 
 if 'linux' in sys.platform.lower() or 'mac' in sys.platform.lower():
-    shell = subprocess.check_output('echo $SHELL', shell=True).decode().strip().split('/')[-1]
-    command = f'echo "export PYTHONPATH=$PYTHONPATH:{cur_path}" >> ~/.{shell}rc && source ~/.{shell}rc'
-    os.system(command)
+    version = sys.version_info
+    version = str(version.major) + '.' + str(version.minor)
+    print('Enter password to execute:')
+    cmd = 'sudo cp ./moex.py /usr/lib/python' + version
+    print(cmd)
+    os.system(cmd)
 
 print('Installation finished!')
 
