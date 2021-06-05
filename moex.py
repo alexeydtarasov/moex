@@ -47,9 +47,12 @@ def _read_token(path: str='../common_data/moex_token.txt'):
 
 def _safe_query(url: str, moex_token: str=None, timeout: int=10):
     headers = dict()
-    if moex_token is not None:
+    try:
         moex_token = _read_token()
+        print(moex_token)
         headers = {"Cookie": f'MicexPassportCert={moex_token}'}
+    except FileNotFoundError:
+        pass
     for _ in range(2):
         try:
             resp = requests.get(url, headers=headers, timeout=timeout)
