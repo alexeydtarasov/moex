@@ -64,7 +64,7 @@ class MoexApi:
                 self.logger.error(
                         f"Authentication failed: invalid login={self.login} or password={self.password}"
                         )
-        self.logger.info("Using API without logging")
+        self.logger.info("Using API without token")
         self.authentification, self.token = False, None
 
     def _history_price_range(self, ticker, date_to, date_from, columns, engine, market,
@@ -316,7 +316,7 @@ class MoexApi:
             self.logger.error("Failed to parse orderbook for %s:\n%s" % (ticker, traceback.format_exc()))
             return None
 
-    def realtime(self,
+    def realtime_quotes(self,
             ticker: str,
             engine: str='stock',
             market: str='shares',
