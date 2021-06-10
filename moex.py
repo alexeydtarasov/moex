@@ -14,7 +14,7 @@ from requests import (
 
 
 TIMEOUT_ERRORS = (ReadTimeout, ConnectTimeout, HTTPError, Timeout, ConnectionError)
-LOG_LEVEL = logging.WARNING
+LOG_LEVEL = logging.DEBUG
 
 
 def _fmt_date(date):
@@ -107,10 +107,9 @@ class MoexApi:
             try:
                 self.logger.info(f'Loading url: {url}')
                 resp = requests.get(url, headers=headers, timeout=timeout)
-                if use_token and ( \
-                                  resp.status_code == 403 or \
-                                  not _is_token_valid(response_headers=resp.headers) \
-                                  ):
+                invalid_token = resp.status_code == 403 or \
+                                  not _is_token_valid(response_headers=resp.headers)
+                if use_token and self.authentification and invalid_token:
                     self.logger.warning(
                             f"Token={self.token} is invalid otherwise you don't have rights for request the url"
                             )
