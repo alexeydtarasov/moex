@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 import traceback
 
-from requests import (
+from requests.exceptions import (
         ReadTimeout,
         ConnectTimeout,
         HTTPError,
