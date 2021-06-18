@@ -98,7 +98,7 @@ class MoexApi:
     def _load_url(self, url: str,
                   use_token: bool=True,
                   n_tries: int=5,
-                  timeout: int=10) -> requests.Response:
+                  timeout: float=10) -> requests.Response:
         headers = dict()
         if use_token:
             headers = {"Cookie": f'MicexPassportCert={self.token}'}
@@ -111,7 +111,7 @@ class MoexApi:
                                   not _is_token_valid(response_headers=resp.headers)
                 if use_token and self.authentification and invalid_token:
                     self.logger.warning(
-                            f"Token={self.token} is invalid otherwise you don't have rights for request the url"
+                            f"Token={self.token} is invalid or you don't have rights for request the url"
                             )
                     self._auth()
                     continue
@@ -371,3 +371,31 @@ class MoexApi:
 
             last_trade_no = result_df.loc[len(result_df) - 1, 'TRADENO']
             additional = f'?tradeno={last_trade_no}&next_trade=1'
+
+    def securities(self,
+                   engine: str = 'stock',
+                   market: str = 'shares',
+                   columns=None,
+                   board_id=None,
+                   realtime=False) -> pd.DataFrame:
+        """
+        Returns: DataFrame with various information (such as last price, lot size, etc.)
+        about all securities from the corresponding market sector
+        """
+        url = f'https://iss.moex.com/iss/engines/{engine}'
+        url += f'/markets/{market}/securities.json'
+        resp = self._load_url(url, use_token=realtime)
+
+        if resp is None:
+            self.logger.error(f"Failed parsing securities table for %s/%s" % (engine, market))
+            return None
+
+        resp = resp.json()['securities']
+        df = pd.DataFrame(resp['data'], columns=resp['columns'])
+
+        if columns is not None:
+            df = df.loc[:, columns]
+        if board_id is not None:
+            df = df.loc[df['BOARDID'] == board_id]
+
+        return df
