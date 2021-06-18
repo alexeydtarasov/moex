@@ -191,7 +191,7 @@ class MoexApi:
                 then function returns data for nearest trade day in the past
             date_from: datetime.date
                 First date of parsing interval. If None, then function will return data
-                for last 50 calendar days (not trading days!)
+                for date_to day only
             columns: list from
                 ['BOARDID', 'TRADEDATE', 'SHORTNAME', 'SECID', 'NUMTRADES', 'VALUE',
                'OPEN', 'LOW', 'HIGH', 'LEGALCLOSEPRICE', 'WAPRICE', 'CLOSE', 'VOLUME',
