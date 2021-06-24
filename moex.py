@@ -14,7 +14,7 @@ from requests.exceptions import (
 
 
 TIMEOUT_ERRORS = (ReadTimeout, ConnectTimeout, HTTPError, Timeout, ConnectionError)
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.WARNING
 
 
 def _fmt_date(date):
