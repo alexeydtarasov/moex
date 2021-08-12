@@ -316,17 +316,20 @@ class MoexApi:
             return None
 
     def realtime_quotes(self,
-            ticker: str,
+            ticker: str or list,
             engine: str='stock',
             market: str='shares',
             boardid: str='TQBR',
             ) -> pd.DataFrame:
         """
+        Ticker's list MUST BE shorter than 11 elements'
         Returns: DataFrame with single row - latest price and some other data
         specified in {colunms} parameter
         """
+        if type(ticker) == list:
+            ticker = ','.join(ticker)
         url = f'https://iss.moex.com/iss/engines/{engine}/markets/{market}'
-        url += f'/securities/{ticker}.json'
+        url += f'/securities.json?securities={ticker}'
         resp = self._load_url(url)
 
         if resp is None:
@@ -387,7 +390,7 @@ class MoexApi:
         resp = self._load_url(url, use_token=realtime)
 
         if resp is None:
-            self.logger.error(f"Failed parsing securities table for %s/%s" % (engine, market))
+            self.logger.error("Failed parsing securities table for %s/%s" % (engine, market))
             return None
 
         resp = resp.json()['securities']
