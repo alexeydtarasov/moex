@@ -90,7 +90,7 @@ class MoexApi:
                 (df['TRADEDATE'].dt.date.between(date_from, date_to)),
                 columns
             ].reset_index(drop=True)
-        self.logger.info(
+        self.logger.debug(
                 "Intermediate dataframe for %s from %s to %s: \n%s" %
                      (ticker, _fmt_date(date_from), _fmt_date(date_to), df))
         return df
@@ -105,7 +105,7 @@ class MoexApi:
 
         for _ in range(n_tries):
             try:
-                self.logger.info(f'Loading url: {url}')
+                self.logger.debug(f'Loading url: {url}')
                 resp = requests.get(url, headers=headers, timeout=timeout)
                 invalid_token = resp.status_code == 403 or \
                                   not _is_token_valid(response_headers=resp.headers)
@@ -116,7 +116,7 @@ class MoexApi:
                     self._auth()
                     continue
                 assert resp is not None and resp.status_code == 200
-                self.logger.info('Url was loaded correctly')
+                self.logger.debug('Url was loaded correctly')
                 return resp
 
             except AssertionError:
@@ -257,7 +257,7 @@ class MoexApi:
             df = df.tail(1)
             result_df = pd.concat([df, result_df], ignore_index=True)
 
-        self.logger.info("Final dataframe for %s from %s to %s: \n%s" %
+        self.logger.debug("Final dataframe for %s from %s to %s: \n%s" %
                      (ticker, _fmt_date(date_from), _fmt_date(date_to), result_df))
 
         return result_df.reset_index(drop=True)
@@ -338,7 +338,7 @@ class MoexApi:
 
         resp = resp.json()['marketdata']
         df = pd.DataFrame(resp['data'], columns=resp['columns'])
-        self.logger.info("%s realtime quotes:\n%s" % (ticker, df))
+        self.logger.debug("%s realtime quotes:\n%s" % (ticker, df))
 
         return df.loc[df['BOARDID'] == boardid].reset_index(drop=True)
 
