@@ -43,7 +43,7 @@ class MoexApi:
                 datefmt='%Y-%m-%d %H:%M:%S',
                 level=LOG_LEVEL
                 )
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger(__name__)
         self.login = login
         self.password = password
         self._auth()
