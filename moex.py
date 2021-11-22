@@ -14,8 +14,15 @@ from requests.exceptions import (
 
 
 TIMEOUT_ERRORS = (ReadTimeout, ConnectTimeout, HTTPError, Timeout, ConnectionError)
-LOG_LEVEL = logging.WARNING
 
+LOG_LEVEL = logging.WARNING
+logging.getLogger('requests').setLevel(logging.WARNING)
+logging.basicConfig(
+                format="[%(levelname)s] %(asctime)s | %(message)s",
+                datefmt='%Y-%m-%d %H:%M:%S',
+                level=LOG_LEVEL
+                )
+moex_logger = logging.getLogger(__name__)
 
 def _fmt_date(date):
     return date.strftime('%Y-%m-%d')
@@ -37,13 +44,7 @@ def _is_token_valid(token: str=None,
 
 class MoexApi:
     def __init__(self, login: str='', password: str=''):
-
-        logging.basicConfig(
-                format="[%(levelname)s] %(asctime)s | %(message)s",
-                datefmt='%Y-%m-%d %H:%M:%S',
-                level=LOG_LEVEL
-                )
-        self.logger = logging.getLogger(__name__)
+        self.logger = moex_logger
         self.login = login
         self.password = password
         self._auth()
@@ -247,7 +248,7 @@ class MoexApi:
             return None
 
         if one_row:
-            return result_df.tail(1)
+            return result_df.tail(1).reset_index(drop=True)
 
         if previous_from_date and date_from < result_df.loc[0, 'TRADEDATE']:
             date_to = date_from
