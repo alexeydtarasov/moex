@@ -130,7 +130,8 @@ class MoexApi:
         err_msg = f"No response from ISS server\nurl: {url}\nheaders: {headers}"
         if resp is not None:
             err_msg += f'\ncode: {resp.status_code}'
-        self.logger.error(err_msg)
+        self.logger.debug(err_msg)
+        return resp
 
     ## ====== Methods can be called without any token and any time delay ========
 
